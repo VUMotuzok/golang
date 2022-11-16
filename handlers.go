@@ -3,13 +3,17 @@ package main
 import (
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
+	"github.com/google/uuid"
+	"github.com/uptrace/bun"
 	"log"
+	"service/models"
 )
 
 var validate = validator.New()
 
 type CreateFundsCreditHandlerDTO struct {
 	UserId string `json:"userId" validate:"required,uuid"`
+	Amount int    `json:"amount" validate:"required,gte=0"`
 }
 
 type CreateFundsReserveHandlerDTO struct {
@@ -27,8 +31,7 @@ func handleError(c *fiber.Ctx, err error) error {
 }
 
 func createFundsCreditHandler(c *fiber.Ctx) error {
-	connection := createConnection()
-	log.Print(connection)
+	db := createConnection()
 
 	dto := new(CreateFundsCreditHandlerDTO)
 
@@ -36,12 +39,54 @@ func createFundsCreditHandler(c *fiber.Ctx) error {
 		return handleError(c, err)
 	}
 
-	err := validate.Struct(dto)
+	if err := validate.Struct(dto); err != nil {
+		return handleError(c, err)
+	}
+
+	user := new(models.UserModel)
+
+	exists, err := db.NewSelect().
+		Model(user).
+		Where("? = ?", bun.Ident("id"), dto.UserId).
+		Exists(c.Context())
+
 	if err != nil {
 		return handleError(c, err)
 	}
 
-	return c.SendString(dto.UserId)
+	if !exists {
+		_, err = db.NewInsert().Model(&models.UserModel{
+			Id:     uuid.Must(uuid.Parse(dto.UserId)),
+			Amount: dto.Amount,
+		}).Exec(c.Context())
+
+		if err != nil {
+			return handleError(c, err)
+		}
+
+		return c.SendStatus(fiber.StatusCreated)
+	}
+
+	err = db.NewSelect().
+		Model(user).
+		Where("? = ?", bun.Ident("id"), dto.UserId).
+		Scan(c.Context())
+
+	if err != nil {
+		return handleError(c, err)
+	}
+
+	_, err = db.NewUpdate().
+		Model(user).
+		Where("? = ?", bun.Ident("id"), dto.UserId).
+		Set("amount = ?", user.Amount+dto.Amount).
+		Exec(c.Context())
+
+	if err != nil {
+		return handleError(c, err)
+	}
+
+	return c.SendStatus(fiber.StatusOK)
 }
 
 func createFundsReserveHandler(c *fiber.Ctx) error {
