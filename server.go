@@ -19,7 +19,10 @@ func createConnection() *bun.DB {
 func main() {
 	app := fiber.New()
 
-	app.Get("/", indexHandler)
+	app.Post("/funds/credit", createFundsCreditHandler)
+	app.Post("/funds/reserve", createFundsReserveHandler)
+	app.Post("/funds/reserve/approve", approveFundsReserveHandler)
+	app.Get("/funds", getFundsHandler)
 
 	log.Fatalln(app.Listen(":3000"))
 }
