@@ -41,15 +41,15 @@ func findUser(db *bun.DB, id string, c *fiber.Ctx) (*models.UserModel, bool, err
 		Where("id=?", id).
 		ScanAndCount(c.Context())
 
-	if err != nil {
+	if err != nil && err != sql.ErrNoRows {
 		return user, false, err
 	}
 
 	if count == 0 {
-		return user, false, err
+		return user, false, nil
 	}
 
-	return user, true, err
+	return user, true, nil
 
 }
 

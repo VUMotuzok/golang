@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/pgdialect"
 	"github.com/uptrace/bun/driver/pgdriver"
@@ -18,6 +19,7 @@ func createConnection() *bun.DB {
 
 func main() {
 	app := fiber.New()
+	app.Use(cors.New())
 
 	app.Post("/funds/credit", createFundsCreditHandler)
 	app.Post("/funds/reserve", createFundsReserveHandler)
