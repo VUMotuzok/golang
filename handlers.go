@@ -6,7 +6,6 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 	"github.com/uptrace/bun"
-	"log"
 	"service/models"
 )
 
@@ -25,7 +24,7 @@ type CreateFundsReserveHandlerDTO struct {
 }
 
 type ApproveFundsReserveHandlerDTO struct {
-	UserId string `json:"userId" validate:"required,uuid"`
+	OrderId string `json:"orderId" validate:"required,uuid"`
 }
 
 func handleError(c *fiber.Ctx, err error) error {
@@ -153,9 +152,7 @@ func createFundsReserveHandler(c *fiber.Ctx) error {
 }
 
 func approveFundsReserveHandler(c *fiber.Ctx) error {
-	connection := createConnection()
-	log.Print(connection)
-
+	db := createConnection()
 	dto := new(ApproveFundsReserveHandlerDTO)
 
 	if err := c.BodyParser(dto); err != nil {
@@ -167,12 +164,54 @@ func approveFundsReserveHandler(c *fiber.Ctx) error {
 		return handleError(c, err)
 	}
 
-	return c.SendString(dto.UserId)
+	transaction := new(models.Transaction)
+
+	isTransactionExists, err := db.NewSelect().
+		Model(transaction).
+		Where("order_id = ?", dto.OrderId).
+		Where("status = ?", "reserved").
+		Exists(c.Context())
+
+	if err != nil {
+		return handleError(c, err)
+	}
+
+	if !isTransactionExists {
+		return c.SendStatus(fiber.StatusBadRequest)
+	}
+
+	_, err = db.NewUpdate().Model(transaction).
+		Where("order_id = ?", dto.OrderId).
+		Where("status = ?", "reserved").
+		Set("status = ?", "approved").
+		Exec(c.Context())
+
+	if err != nil {
+		return handleError(c, err)
+	}
+
+	return c.SendStatus(fiber.StatusOK)
 }
 
 func getFundsHandler(c *fiber.Ctx) error {
-	connection := createConnection()
-	log.Print(connection)
+	db := createConnection()
+	userId := c.Params("userId")
 
-	return c.SendStatus(fiber.StatusOK)
+	if err := validate.Var(userId, "required,uuid"); err != nil {
+		return handleError(c, err)
+	}
+
+	user, isUserFound, err := findUser(db, userId, c)
+
+	if err != nil {
+		return handleError(c, err)
+	}
+
+	if !isUserFound {
+		return c.SendStatus(fiber.StatusBadRequest)
+	}
+
+	return c.JSON(fiber.Map{
+		"amount": user.Amount,
+	})
 }

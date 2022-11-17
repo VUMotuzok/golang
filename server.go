@@ -22,7 +22,7 @@ func main() {
 	app.Post("/funds/credit", createFundsCreditHandler)
 	app.Post("/funds/reserve", createFundsReserveHandler)
 	app.Post("/funds/reserve/approve", approveFundsReserveHandler)
-	app.Get("/funds", getFundsHandler)
+	app.Get("/funds/:userId", getFundsHandler)
 
 	log.Fatalln(app.Listen(":3000"))
 }
